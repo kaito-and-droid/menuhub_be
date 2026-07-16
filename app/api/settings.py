@@ -1,0 +1,103 @@
+from fastapi import APIRouter, HTTPException, status
+
+from app.core.cache import delete as cache_delete
+from app.core.cache import menu_key
+from app.core.deps import CurrentShop, CurrentUser, DbSession
+from app.models import Shop, UserRole
+from app.schemas.settings import ShopSettingsOut, ShopSettingsUpdate
+from app.services.audit import MASK, changed_fields, record_audit
+from app.services.orders import prep_minutes
+
+router = APIRouter(prefix="/api/shops/{shop_id}/settings", tags=["settings"])
+
+
+def _to_out(shop: Shop) -> ShopSettingsOut:
+    shop_settings = shop.settings or {}
+    return ShopSettingsOut(
+        shop_name=shop.shop_name,
+        slug=shop.slug,
+        email=shop.email,
+        phone=shop.phone,
+        address=shop.address,
+        timezone=shop.timezone,
+        currency=shop.currency,
+        payment_methods=shop.payment_methods,
+        prep_minutes=prep_minutes(shop),
+        paynow_proxy_type=shop_settings.get("paynow_proxy_type"),
+        paynow_proxy_value=shop_settings.get("paynow_proxy_value"),
+        facebook_page_id=shop.facebook_page_id,
+        facebook_connected=bool(shop.facebook_page_id and shop.facebook_app_access_token),
+    )
+
+
+@router.get("", response_model=ShopSettingsOut)
+async def get_settings(shop: CurrentShop) -> ShopSettingsOut:
+    return _to_out(shop)
+
+
+@router.patch("", response_model=ShopSettingsOut)
+async def update_settings(
+    body: ShopSettingsUpdate, shop: CurrentShop, user: CurrentUser, db: DbSession
+) -> ShopSettingsOut:
+    if user.role != UserRole.owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the owner can change settings")
+
+    updates = body.model_dump(exclude_unset=True)
+    audit_updates = dict(updates)
+    if "facebook_page_access_token" in audit_updates:
+        audit_updates["facebook_page_access_token"] = MASK
+
+    shop_settings = shop.settings or {}
+    old_snapshot = {
+        "shop_name": shop.shop_name,
+        "email": shop.email,
+        "phone": shop.phone,
+        "address": shop.address,
+        "payment_methods": shop.payment_methods,
+        "prep_minutes": prep_minutes(shop),
+        "currency": shop.currency,
+        "paynow_proxy_type": shop_settings.get("paynow_proxy_type"),
+        "paynow_proxy_value": shop_settings.get("paynow_proxy_value"),
+        "facebook_page_id": shop.facebook_page_id,
+        "facebook_page_access_token": MASK if shop.facebook_app_access_token else None,
+    }
+
+    # PayNow eligibility must hold for the post-update state
+    next_currency = updates.get("currency", shop.currency)
+    next_methods = updates.get("payment_methods", shop.payment_methods)
+    next_proxy_type = updates.get("paynow_proxy_type", shop_settings.get("paynow_proxy_type"))
+    next_proxy_value = updates.get("paynow_proxy_value", shop_settings.get("paynow_proxy_value"))
+    if next_methods.get("paynow"):
+        if next_currency != "SGD":
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "PayNow requires the shop currency to be SGD"
+            )
+        if not (next_proxy_type and next_proxy_value):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Configure your PayNow UEN or mobile number before enabling PayNow",
+            )
+
+    if "facebook_page_access_token" in updates:
+        token = updates.pop("facebook_page_access_token")
+        shop.facebook_app_access_token = token or None
+    # Reassign the JSONB dict so SQLAlchemy sees the change
+    new_settings = dict(shop_settings)
+    for json_field in ("prep_minutes", "paynow_proxy_type", "paynow_proxy_value"):
+        if json_field in updates:
+            value = updates.pop(json_field)
+            if value is None:
+                new_settings.pop(json_field, None)
+            else:
+                new_settings[json_field] = value
+    shop.settings = new_settings
+    for field, value in updates.items():
+        setattr(shop, field, value)
+
+    old, new = changed_fields(old_snapshot, audit_updates)
+    if new:
+        record_audit(db, shop.id, user.id, "updated", "shop_settings", shop.id, old, new)
+    await db.commit()
+    # Public menu embeds shop name, page id, and wait minutes
+    await cache_delete(menu_key(shop.slug))
+    return _to_out(shop)
