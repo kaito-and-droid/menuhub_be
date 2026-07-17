@@ -20,12 +20,19 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 @lru_cache
 def _private_key() -> str:
-    return get_settings().jwt_private_key_path.read_text()
+    settings = get_settings()
+    if settings.jwt_private_key:
+        # Some env systems might replace newlines with literal '\n', so we unescape it if needed.
+        return settings.jwt_private_key.replace("\\n", "\n")
+    return settings.jwt_private_key_path.read_text()
 
 
 @lru_cache
 def _public_key() -> str:
-    return get_settings().jwt_public_key_path.read_text()
+    settings = get_settings()
+    if settings.jwt_public_key:
+        return settings.jwt_public_key.replace("\\n", "\n")
+    return settings.jwt_public_key_path.read_text()
 
 
 def _create_token(

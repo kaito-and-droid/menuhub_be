@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://menuhub:menuhub@localhost:5432/menuhub"
     redis_url: str = "redis://localhost:6379/0"
+    jwt_private_key: str | None = None
+    jwt_public_key: str | None = None
     jwt_private_key_path: Path = Path("keys/jwt_private.pem")
     jwt_public_key_path: Path = Path("keys/jwt_public.pem")
     access_token_expire_minutes: int = 30
