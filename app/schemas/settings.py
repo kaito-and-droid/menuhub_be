@@ -41,6 +41,7 @@ class OrderPageConfig(BaseModel):
     tiktok_username: str | None = Field(default=None, max_length=100)
     facebook_page_url: str | None = Field(default=None, max_length=255)
     media_gallery: list[GalleryItem] = []
+    menu_layout: Literal["grid", "list"] = "grid"
 
 
 class TikTokAddRequest(BaseModel):
