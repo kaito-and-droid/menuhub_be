@@ -1,6 +1,23 @@
+import uuid
+
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+class GalleryItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source: Literal["facebook_photo", "tiktok"]
+    source_url: str | None = None
+    thumbnail_url: str | None = None
+    embed_html: str | None = None
+    sort_order: int = 0
+    active: bool = True
+
+
+class GalleryReorderItem(BaseModel):
+    id: str
+    sort_order: int
 
 
 class SeoConfig(BaseModel):
@@ -23,6 +40,11 @@ class OrderPageConfig(BaseModel):
     instagram_handle: str | None = Field(default=None, max_length=100)
     tiktok_username: str | None = Field(default=None, max_length=100)
     facebook_page_url: str | None = Field(default=None, max_length=255)
+    media_gallery: list[GalleryItem] = []
+
+
+class TikTokAddRequest(BaseModel):
+    url: str = Field(..., max_length=500)
 
 
 class ShopSettingsOut(BaseModel):
