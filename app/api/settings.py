@@ -4,8 +4,16 @@ from app.core.cache import delete as cache_delete
 from app.core.cache import menu_key
 from app.core.deps import CurrentShop, CurrentUser, DbSession
 from app.models import Shop, UserRole
-from app.schemas.settings import ShopSettingsOut, ShopSettingsUpdate, OrderPageConfig, SeoConfig
+from app.schemas.settings import (
+    GalleryItem,
+    OrderPageConfig,
+    SeoConfig,
+    ShopSettingsOut,
+    ShopSettingsUpdate,
+    TikTokAddRequest,
+)
 from app.services.audit import MASK, changed_fields, record_audit
+from app.services.gallery import fetch_tiktok_oembed, sync_facebook_photos
 from app.services.orders import prep_minutes
 
 router = APIRouter(prefix="/api/shops/{shop_id}/settings", tags=["settings"])
@@ -26,6 +34,7 @@ def _to_out(shop: Shop) -> ShopSettingsOut:
         instagram_handle=order_page_data.get("instagram_handle"),
         tiktok_username=order_page_data.get("tiktok_username"),
         facebook_page_url=order_page_data.get("facebook_page_url"),
+        media_gallery=order_page_data.get("media_gallery", []),
     )
     seo_data = shop_settings.get("seo") or {}
     seo = SeoConfig(
@@ -135,3 +144,96 @@ async def update_settings(
     # Public menu embeds shop name, page id, and wait minutes
     await cache_delete(menu_key(shop.slug))
     return _to_out(shop)
+
+
+def _get_media_gallery(shop: Shop) -> list[dict]:
+    shop_settings = shop.settings or {}
+    order_page = shop_settings.get("order_page", {})
+    return list(order_page.get("media_gallery", []))
+
+
+def _set_media_gallery(shop: Shop, items: list[dict]) -> None:
+    shop_settings = dict(shop.settings or {})
+    order_page = dict(shop_settings.get("order_page", {}))
+    order_page["media_gallery"] = items
+    shop_settings["order_page"] = order_page
+    shop.settings = shop_settings
+
+
+@router.post("/gallery/sync-facebook", response_model=list[GalleryItem])
+async def sync_facebook_gallery(
+    shop: CurrentShop, user: CurrentUser, db: DbSession
+) -> list[GalleryItem]:
+    if user.role != UserRole.owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the owner can manage gallery")
+    fb_items = await sync_facebook_photos(shop)
+    existing = _get_media_gallery(shop)
+    kept = [item for item in existing if item.get("source") != "facebook_photo"]
+    merged = kept + fb_items
+    _set_media_gallery(shop, merged)
+    await db.commit()
+    await db.refresh(shop)
+    await cache_delete(menu_key(shop.slug))
+    return [GalleryItem(**item) for item in _get_media_gallery(shop)]
+
+
+@router.post("/gallery/tiktok", response_model=list[GalleryItem])
+async def add_tiktok_video(
+    body: TikTokAddRequest,
+    shop: CurrentShop,
+    user: CurrentUser,
+    db: DbSession,
+) -> list[GalleryItem]:
+    if user.role != UserRole.owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the owner can manage gallery")
+    item = await fetch_tiktok_oembed(body.url)
+    if item is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid TikTok URL or video not found")
+    existing = _get_media_gallery(shop)
+    item["sort_order"] = len(existing)
+    existing.append(item)
+    _set_media_gallery(shop, existing)
+    await db.commit()
+    await db.refresh(shop)
+    await cache_delete(menu_key(shop.slug))
+    return [GalleryItem(**item) for item in _get_media_gallery(shop)]
+
+
+@router.delete("/gallery/{item_id}", response_model=list[GalleryItem])
+async def delete_gallery_item(
+    item_id: str,
+    shop: CurrentShop,
+    user: CurrentUser,
+    db: DbSession,
+) -> list[GalleryItem]:
+    if user.role != UserRole.owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the owner can manage gallery")
+    existing = _get_media_gallery(shop)
+    filtered = [item for item in existing if item.get("id") != item_id]
+    _set_media_gallery(shop, filtered)
+    await db.commit()
+    await db.refresh(shop)
+    await cache_delete(menu_key(shop.slug))
+    return [GalleryItem(**item) for item in _get_media_gallery(shop)]
+
+
+@router.put("/gallery/reorder", response_model=list[GalleryItem])
+async def reorder_gallery(
+    body: list[dict],
+    shop: CurrentShop,
+    user: CurrentUser,
+    db: DbSession,
+) -> list[GalleryItem]:
+    if user.role != UserRole.owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the owner can manage gallery")
+    existing = _get_media_gallery(shop)
+    id_order = {item["id"]: item["sort_order"] for item in body}
+    for item in existing:
+        if item["id"] in id_order:
+            item["sort_order"] = id_order[item["id"]]
+    existing.sort(key=lambda x: x.get("sort_order", 0))
+    _set_media_gallery(shop, existing)
+    await db.commit()
+    await db.refresh(shop)
+    await cache_delete(menu_key(shop.slug))
+    return [GalleryItem(**item) for item in _get_media_gallery(shop)]
