@@ -112,7 +112,7 @@ async def update_settings(
         if nested_field in updates:
             val = updates.pop(nested_field)
             if val is not None:
-                new_settings[nested_field] = val.model_dump(exclude_unset=True)
+                new_settings[nested_field] = val
             else:
                 new_settings.pop(nested_field, None)
 
