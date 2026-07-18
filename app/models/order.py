@@ -54,6 +54,7 @@ class OrderItem(Base, UUIDPkMixin):
 
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"))
     menu_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("menu_items.id"))
+    variant_name: Mapped[str | None] = mapped_column(String(255))
     quantity: Mapped[int] = mapped_column(Integer)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     # COGS snapshot taken at order time so later menu cost edits don't rewrite history

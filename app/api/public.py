@@ -62,6 +62,11 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
         )
     ).all()
 
+    def public_variants(item: MenuItem) -> list[dict]:
+        if not item.variants:
+            return []
+        return [{"name": v["name"], "price": v["price"]} for v in item.variants]
+
     by_category: dict[uuid.UUID | None, list[PublicItemOut]] = {}
     for item in items:
         by_category.setdefault(item.category_id, []).append(
@@ -72,6 +77,7 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
                 price=float(item.price),
                 image_url=item.image_url,
                 is_available=item.is_available,
+                variants=public_variants(item),
             )
         )
 
@@ -98,6 +104,10 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
         for c in await get_running_campaigns(db, shop.id)
     ]
 
+    shop_settings = shop.settings or {}
+    seo_data = shop_settings.get("seo")
+    order_page_data = shop_settings.get("order_page")
+
     response = PublicMenuResponse(
         shop_name=shop.shop_name,
         facebook_page_id=shop.facebook_page_id,
@@ -110,6 +120,8 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
         ],
         campaigns=campaigns,
         categories=out_categories,
+        order_page=order_page_data,
+        seo=seo_data,
     )
     await set_json(menu_key(shop_slug), response.model_dump(mode="json"), MENU_TTL_SECONDS)
     return response

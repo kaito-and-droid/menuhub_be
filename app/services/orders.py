@@ -125,8 +125,19 @@ async def create_order(
                 f"A valid postal code ({hint}) is required for delivery",
             )
 
+    def variant_price(menu_item: MenuItem, variant_name: str | None) -> Decimal:
+        if variant_name and menu_item.variants:
+            for v in menu_item.variants:
+                if v["name"] == variant_name:
+                    return Decimal(str(v["price"]))
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Variant '{variant_name}' not found for item '{menu_item.name}'",
+            )
+        return menu_item.price
+
     subtotal = sum(
-        (menu_items[line.menu_item_id].price * line.quantity for line in body.items),
+        (variant_price(menu_items[line.menu_item_id], line.variant_name) * line.quantity for line in body.items),
         Decimal(0),
     )
     discount, campaign = compute_discount(subtotal, await get_running_campaigns(db, shop.id))
@@ -193,10 +204,11 @@ async def create_order(
         OrderItem(
             order_id=order.id,
             menu_item_id=line.menu_item_id,
+            variant_name=line.variant_name,
             quantity=line.quantity,
-            unit_price=menu_items[line.menu_item_id].price,
+            unit_price=variant_price(menu_items[line.menu_item_id], line.variant_name),
             unit_cost=menu_items[line.menu_item_id].cost,
-            subtotal=menu_items[line.menu_item_id].price * line.quantity,
+            subtotal=variant_price(menu_items[line.menu_item_id], line.variant_name) * line.quantity,
             notes=line.notes,
         )
         for line in body.items

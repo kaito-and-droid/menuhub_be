@@ -34,6 +34,8 @@ class MenuItem(Base, UUIDPkMixin, CreatedAtMixin):
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
     # Recipe: [{ingredient_id, quantity, unit}]
     ingredients: Mapped[list] = mapped_column(JSONB, default=list)
+    # Variants: [{name, price, cost?}] — null/empty means single-price item
+    variants: Mapped[list | None] = mapped_column(JSONB, default=None)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

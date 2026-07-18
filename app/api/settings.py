@@ -4,7 +4,7 @@ from app.core.cache import delete as cache_delete
 from app.core.cache import menu_key
 from app.core.deps import CurrentShop, CurrentUser, DbSession
 from app.models import Shop, UserRole
-from app.schemas.settings import ShopSettingsOut, ShopSettingsUpdate
+from app.schemas.settings import ShopSettingsOut, ShopSettingsUpdate, OrderPageConfig, SeoConfig
 from app.services.audit import MASK, changed_fields, record_audit
 from app.services.orders import prep_minutes
 
@@ -13,6 +13,27 @@ router = APIRouter(prefix="/api/shops/{shop_id}/settings", tags=["settings"])
 
 def _to_out(shop: Shop) -> ShopSettingsOut:
     shop_settings = shop.settings or {}
+    order_page_data = shop_settings.get("order_page") or {}
+    order_page = OrderPageConfig(
+        banner_image_url=order_page_data.get("banner_image_url"),
+        banner_headline=order_page_data.get("banner_headline"),
+        banner_subtitle=order_page_data.get("banner_subtitle"),
+        announcement=order_page_data.get("announcement"),
+        announcement_style=order_page_data.get("announcement_style", "promo"),
+        show_address=order_page_data.get("show_address", True),
+        show_phone=order_page_data.get("show_phone", True),
+        opening_hours=order_page_data.get("opening_hours"),
+        instagram_handle=order_page_data.get("instagram_handle"),
+        tiktok_username=order_page_data.get("tiktok_username"),
+        facebook_page_url=order_page_data.get("facebook_page_url"),
+    )
+    seo_data = shop_settings.get("seo") or {}
+    seo = SeoConfig(
+        title_template=seo_data.get("title_template"),
+        description=seo_data.get("description"),
+        keywords=seo_data.get("keywords"),
+        og_image_url=seo_data.get("og_image_url"),
+    )
     return ShopSettingsOut(
         shop_name=shop.shop_name,
         slug=shop.slug,
@@ -27,6 +48,8 @@ def _to_out(shop: Shop) -> ShopSettingsOut:
         paynow_proxy_value=shop_settings.get("paynow_proxy_value"),
         facebook_page_id=shop.facebook_page_id,
         facebook_connected=bool(shop.facebook_page_id and shop.facebook_app_access_token),
+        order_page=order_page,
+        seo=seo,
     )
 
 
@@ -60,6 +83,8 @@ async def update_settings(
         "paynow_proxy_value": shop_settings.get("paynow_proxy_value"),
         "facebook_page_id": shop.facebook_page_id,
         "facebook_page_access_token": MASK if shop.facebook_app_access_token else None,
+        "order_page": shop_settings.get("order_page"),
+        "seo": shop_settings.get("seo"),
     }
 
     # PayNow eligibility must hold for the post-update state
@@ -83,6 +108,14 @@ async def update_settings(
         shop.facebook_app_access_token = token or None
     # Reassign the JSONB dict so SQLAlchemy sees the change
     new_settings = dict(shop_settings)
+    for nested_field in ("order_page", "seo"):
+        if nested_field in updates:
+            val = updates.pop(nested_field)
+            if val is not None:
+                new_settings[nested_field] = val.model_dump(exclude_unset=True)
+            else:
+                new_settings.pop(nested_field, None)
+
     for json_field in ("prep_minutes", "paynow_proxy_type", "paynow_proxy_value"):
         if json_field in updates:
             value = updates.pop(json_field)
