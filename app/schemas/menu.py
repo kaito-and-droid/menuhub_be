@@ -3,12 +3,19 @@ import uuid
 from pydantic import BaseModel, Field
 
 from app.schemas.campaigns import PublicCampaign
+from app.schemas.settings import OrderPageConfig, SeoConfig
 
 
 class RecipeLine(BaseModel):
     ingredient_id: uuid.UUID
     quantity: float = Field(gt=0)
     unit: str
+
+
+class ItemVariant(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    price: float = Field(gt=0)
+    cost: float | None = Field(default=None, ge=0)
 
 
 class CategoryCreate(BaseModel):
@@ -35,6 +42,7 @@ class ItemCreate(BaseModel):
     image_url: str | None = Field(default=None, max_length=1000)
     is_available: bool = True
     ingredients: list[RecipeLine] = []
+    variants: list[ItemVariant] = []
 
 
 class ItemUpdate(BaseModel):
@@ -46,6 +54,7 @@ class ItemUpdate(BaseModel):
     image_url: str | None = Field(default=None, max_length=1000)
     is_available: bool | None = None
     ingredients: list[RecipeLine] | None = None
+    variants: list[ItemVariant] | None = None
 
 
 class AdminItemOut(BaseModel):
@@ -59,6 +68,7 @@ class AdminItemOut(BaseModel):
     image_url: str | None
     is_available: bool
     ingredients: list
+    variants: list = []
 
 
 class AdminCategoryWithItems(BaseModel):
@@ -81,6 +91,7 @@ class PublicItemOut(BaseModel):
     price: float
     image_url: str | None
     is_available: bool
+    variants: list = []  # [{name, price}] — no cost exposed to public
 
 
 class PublicCategoryOut(BaseModel):
@@ -96,3 +107,5 @@ class PublicMenuResponse(BaseModel):
     payment_methods: list[str] = []
     campaigns: list[PublicCampaign] = []
     categories: list[PublicCategoryOut]
+    order_page: OrderPageConfig | None = None
+    seo: SeoConfig | None = None

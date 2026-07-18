@@ -7,7 +7,7 @@ from app.core.cache import delete as cache_delete
 from app.core.cache import menu_key
 from app.core.deps import CurrentShop, CurrentUser, DbSession
 from app.models import Ingredient, MenuCategory, MenuItem
-from app.schemas.menu import RecipeLine
+from app.schemas.menu import ItemVariant, RecipeLine
 from app.services.audit import changed_fields, record_audit
 from app.schemas.menu import (
     AdminCategoryWithItems,
@@ -141,6 +141,12 @@ async def _validate_recipe(db: DbSession, shop_id: uuid.UUID, lines: list[Recipe
         )
 
 
+def _validate_variants(variants: list[ItemVariant]) -> None:
+    names = [v.name for v in variants]
+    if len(names) != len(set(names)):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Variant names must be unique")
+
+
 @router.post("/items", status_code=status.HTTP_201_CREATED, response_model=AdminItemOut)
 async def create_item(
     body: ItemCreate, shop: CurrentShop, user: CurrentUser, db: DbSession
@@ -148,6 +154,7 @@ async def create_item(
     if body.category_id is not None:
         await _get_owned_category(db, shop.id, body.category_id)
     await _validate_recipe(db, shop.id, body.ingredients)
+    _validate_variants(body.variants)
     item = MenuItem(
         shop_id=shop.id,
         category_id=body.category_id,
@@ -158,6 +165,7 @@ async def create_item(
         image_url=body.image_url,
         is_available=body.is_available,
         ingredients=[line.model_dump(mode="json") for line in body.ingredients],
+        variants=[v.model_dump(mode="json") for v in body.variants] if body.variants else None,
     )
     db.add(item)
     await db.flush()
@@ -188,6 +196,11 @@ async def update_item(
         updates["ingredients"] = [
             line.model_dump(mode="json") for line in body.ingredients or []
         ]
+    if "variants" in updates and updates["variants"] is not None:
+        _validate_variants(body.variants)
+        updates["variants"] = [v.model_dump(mode="json") for v in body.variants]
+    elif "variants" in updates and updates["variants"] is None:
+        updates["variants"] = None
 
     old_snapshot = {field: getattr(item, field) for field in updates}
     old, new = changed_fields(old_snapshot, updates)

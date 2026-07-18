@@ -66,6 +66,7 @@ def to_order_out(order: Order) -> OrderOut:
                 unit_price=float(item.unit_price),
                 subtotal=float(item.subtotal),
                 notes=item.notes,
+                variant_name=item.variant_name,
             )
             for item in order.items
         ],

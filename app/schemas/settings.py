@@ -3,6 +3,28 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+class SeoConfig(BaseModel):
+    title_template: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    keywords: str | None = Field(default=None, max_length=500)
+    og_image_url: str | None = Field(default=None, max_length=1000)
+
+
+class OrderPageConfig(BaseModel):
+    """Configurable appearance & info shown on the public order page."""
+    banner_image_url: str | None = Field(default=None, max_length=1000)
+    banner_headline: str | None = Field(default=None, max_length=200)
+    banner_subtitle: str | None = Field(default=None, max_length=300)
+    announcement: str | None = Field(default=None, max_length=300)
+    announcement_style: Literal["info", "warning", "promo"] = "promo"
+    show_address: bool = True
+    show_phone: bool = True
+    opening_hours: str | None = Field(default=None, max_length=500)
+    instagram_handle: str | None = Field(default=None, max_length=100)
+    tiktok_username: str | None = Field(default=None, max_length=100)
+    facebook_page_url: str | None = Field(default=None, max_length=255)
+
+
 class ShopSettingsOut(BaseModel):
     shop_name: str
     slug: str
@@ -17,6 +39,8 @@ class ShopSettingsOut(BaseModel):
     paynow_proxy_value: str | None
     facebook_page_id: str | None
     facebook_connected: bool
+    order_page: OrderPageConfig
+    seo: SeoConfig
 
 
 class ShopSettingsUpdate(BaseModel):
@@ -32,6 +56,8 @@ class ShopSettingsUpdate(BaseModel):
     facebook_page_id: str | None = Field(default=None, max_length=100)
     # Write-only: readable state is exposed as facebook_connected
     facebook_page_access_token: str | None = Field(default=None, max_length=500)
+    order_page: OrderPageConfig | None = None
+    seo: SeoConfig | None = None
 
     @field_validator("payment_methods")
     @classmethod

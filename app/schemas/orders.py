@@ -16,6 +16,7 @@ class OrderCustomerIn(BaseModel):
 class OrderItemIn(BaseModel):
     menu_item_id: uuid.UUID
     quantity: int = Field(ge=1, le=100)
+    variant_name: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=500)
 
 
@@ -44,6 +45,7 @@ class OrderItemOut(BaseModel):
     unit_price: float
     subtotal: float
     notes: str | None
+    variant_name: str | None = None
 
 
 class OrderCustomerOut(BaseModel):

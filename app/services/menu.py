@@ -22,4 +22,5 @@ def to_admin_item(item: MenuItem) -> AdminItemOut:
         image_url=item.image_url,
         is_available=item.is_available,
         ingredients=item.ingredients or [],
+        variants=item.variants or [],
     )

@@ -11,7 +11,7 @@ ANALYTICS_TTL_SECONDS = 1800
 
 # Bump the version whenever PublicMenuResponse's shape changes — stale cached
 # payloads from an older schema would otherwise serve field defaults until TTL.
-_MENU_SCHEMA_VERSION = 2
+_MENU_SCHEMA_VERSION = 4
 
 
 def menu_key(slug: str) -> str:
