@@ -122,6 +122,7 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
         categories=out_categories,
         order_page=order_page_data,
         seo=seo_data,
+        menu_layout=order_page_data.get("menu_layout", "grid") if order_page_data else "grid",
     )
     await set_json(menu_key(shop_slug), response.model_dump(mode="json"), MENU_TTL_SECONDS)
     return response

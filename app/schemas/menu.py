@@ -109,3 +109,4 @@ class PublicMenuResponse(BaseModel):
     categories: list[PublicCategoryOut]
     order_page: OrderPageConfig | None = None
     seo: SeoConfig | None = None
+    menu_layout: str = "grid"  # "grid" | "list" — how items render on the public order page
