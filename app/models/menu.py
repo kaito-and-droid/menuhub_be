@@ -31,6 +31,8 @@ class MenuItem(Base, UUIDPkMixin, CreatedAtMixin):
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     image_url: Mapped[str | None] = mapped_column(String(1000))
+    # Additional gallery images: ["https://...", ...]. image_url stays the primary/first image.
+    image_urls: Mapped[list | None] = mapped_column(JSONB, default=None)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
     # Recipe: [{ingredient_id, quantity, unit}]
     ingredients: Mapped[list] = mapped_column(JSONB, default=list)

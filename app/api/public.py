@@ -8,6 +8,7 @@ from app.core.deps import DbSession
 from app.core.ratelimit import rate_limit
 from app.schemas.campaigns import PublicCampaign
 from app.services.campaigns import discount_label, get_running_campaigns
+from app.services.menu import item_image_urls
 from app.services.orders import prep_minutes
 from app.services.paynow import build_paynow_qr
 from app.models import (
@@ -76,6 +77,7 @@ async def public_menu(shop_slug: str, db: DbSession) -> PublicMenuResponse:
                 description=item.description,
                 price=float(item.price),
                 image_url=item.image_url,
+                image_urls=item_image_urls(item),
                 is_available=item.is_available,
                 variants=public_variants(item),
             )

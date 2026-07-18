@@ -163,6 +163,7 @@ async def create_item(
         price=body.price,
         cost=body.cost,
         image_url=body.image_url,
+        image_urls=body.image_urls or None,
         is_available=body.is_available,
         ingredients=[line.model_dump(mode="json") for line in body.ingredients],
         variants=[v.model_dump(mode="json") for v in body.variants] if body.variants else None,
@@ -201,6 +202,8 @@ async def update_item(
         updates["variants"] = [v.model_dump(mode="json") for v in body.variants]
     elif "variants" in updates and updates["variants"] is None:
         updates["variants"] = None
+    if "image_urls" in updates:
+        updates["image_urls"] = updates["image_urls"] or None
 
     old_snapshot = {field: getattr(item, field) for field in updates}
     old, new = changed_fields(old_snapshot, updates)
