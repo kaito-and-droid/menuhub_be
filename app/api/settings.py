@@ -131,6 +131,7 @@ async def update_settings(
     if new:
         record_audit(db, shop.id, user.id, "updated", "shop_settings", shop.id, old, new)
     await db.commit()
+    await db.refresh(shop)
     # Public menu embeds shop name, page id, and wait minutes
     await cache_delete(menu_key(shop.slug))
     return _to_out(shop)
