@@ -40,6 +40,7 @@ class ItemCreate(BaseModel):
     price: float = Field(gt=0)
     cost: float | None = Field(default=None, ge=0)
     image_url: str | None = Field(default=None, max_length=1000)
+    image_urls: list[str] = Field(default_factory=list, max_length=10)
     is_available: bool = True
     ingredients: list[RecipeLine] = []
     variants: list[ItemVariant] = []
@@ -52,6 +53,7 @@ class ItemUpdate(BaseModel):
     price: float | None = Field(default=None, gt=0)
     cost: float | None = Field(default=None, ge=0)
     image_url: str | None = Field(default=None, max_length=1000)
+    image_urls: list[str] | None = Field(default=None, max_length=10)
     is_available: bool | None = None
     ingredients: list[RecipeLine] | None = None
     variants: list[ItemVariant] | None = None
@@ -66,6 +68,7 @@ class AdminItemOut(BaseModel):
     cost: float | None
     margin: str | None
     image_url: str | None
+    image_urls: list[str] = []
     is_available: bool
     ingredients: list
     variants: list = []
@@ -90,6 +93,7 @@ class PublicItemOut(BaseModel):
     description: str | None
     price: float
     image_url: str | None
+    image_urls: list[str] = []
     is_available: bool
     variants: list = []  # [{name, price}] — no cost exposed to public
 
